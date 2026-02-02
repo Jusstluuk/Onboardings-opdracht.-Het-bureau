@@ -131,6 +131,48 @@
         .order-btn:active {
             transform: translateY(0);
         }
+        .cart {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .cart h3 {
+            color: #ec4e20;
+            margin-bottom: 15px;
+        }
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+        .cart-total {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ec4e20;
+            text-align: right;
+            margin-top: 15px;
+        }
+        .add-to-cart-btn {
+            background-color: rgb(214, 57, 22);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 10px;
+        }
+        .add-to-cart-btn:hover {
+            background-color: rgb(214, 57, 22);
+        }
         .thank-you {
             display: none;
             text-align: center;
@@ -181,19 +223,19 @@
           
             <div class="selections-container">
                 <div class="selection-section">
-                    <label for="product">Kies producttype:</label>
+                    <label for="product">product:</label>
                     <select id="product">
                         <option value=""></option>
                     </select>
                 </div>
                 <div class="selection-section">
-                    <label for="symbol">Kies symbool:</label>
+                    <label for="symbol">symbool:</label>
                     <select id="symbol">
                         <option value=""></option>
                     </select>
                 </div>
                 <div class="selection-section">
-                    <label for="colour">Kies kleur:</label>
+                    <label for="colour">kleur:</label>
                     <select id="colour">
                         <option value=""></option>
                     </select>
@@ -210,11 +252,17 @@
                     <p id="product-info">Maak je keuzes om je product te zien</p>
                     <p id="total-price" class="total-price"></p>
                 </div>
+                <button class="add-to-cart-btn" id="add-to-cart-btn">Toevoegen aan winkelmand</button>
                 <button class="order-btn" id="order-btn">Bestel nu</button>
             </div>
         </div>
 
-   
+        <div class="cart" id="cart">
+            <h3>Winkelmand</h3>
+            <div id="cart-items"></div>
+            <div class="cart-total" id="cart-total">Totaal: €0.00</div>
+        </div>
+
         <div class="thank-you" id="thank-you">
             <h2> Bedankt voor je bestelling!</h2>
             <p>Je order is succesvol ontvangen en wordt binnenkort verwerkt.</p>
@@ -229,6 +277,7 @@
         let selectedProduct = null;
         let selectedSymbol = null;
         let selectedColour = null;
+        let cart = [];
 
       
         fetch('assets/dataset.json')
@@ -364,8 +413,96 @@
             });
         });
 
+        function addToCart() {
+            if (!selectedProduct || !selectedSymbol || !selectedColour) {
+                alert('Selecteer alle opties voordat je toevoegt aan de winkelmand.');
+                return;
+            }
+
+            const item = {
+                product: selectedProduct,
+                symbol: selectedSymbol,
+                colour: selectedColour,
+                price: selectedProduct.price + selectedColour.price_add
+            };
+
+            cart.push(item);
+            updateCartDisplay();
+
+            document.getElementById('product').value = '';
+            document.getElementById('symbol').value = '';
+            document.getElementById('colour').value = '';
+            selectedProduct = null;
+            selectedSymbol = null;
+            selectedColour = null;
+            updateDisplay();
+        }
+
+        function updateCartDisplay() {
+            const cartItems = document.getElementById('cart-items');
+            const cartTotal = document.getElementById('cart-total');
+
+            cartItems.innerHTML = '';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'cart-item';
+                itemDiv.innerHTML = `
+                    <span>${item.product.name} (${item.colour.name}) met ${item.symbol.name}</span>
+                    <span>€${item.price.toFixed(2)}</span>
+                `;
+                cartItems.appendChild(itemDiv);
+                total += item.price;
+            });
+
+            cartTotal.textContent = `Totaal: €${total.toFixed(2)}`;
+        }
+
+        document.getElementById('add-to-cart-btn').addEventListener('click', addToCart);
+
+        document.getElementById('order-btn').addEventListener('click', () => {
+            if (cart.length === 0) {
+                alert('Voeg eerst producten toe aan de winkelmand.');
+                return;
+            }
+
+            const orderData = cart.map(item => ({
+                producttype: item.product.id,
+                symbol: item.symbol.id,
+                colour: item.colour.id
+            }));
+
+            fetch('https://localhost/skills/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(orderData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('configurator').style.display = 'none';
+                    document.getElementById('cart').style.display = 'none';
+                    document.getElementById('thank-you').style.display = 'block';
+                    cart = [];
+                } else {
+                    alert('Er is een fout opgetreden bij het plaatsen van de bestelling.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('configurator').style.display = 'none';
+                document.getElementById('cart').style.display = 'none';
+                document.getElementById('thank-you').style.display = 'block';
+                cart = [];
+            });
+        });
+
         document.getElementById('restart-btn').addEventListener('click', () => {
             document.getElementById('configurator').style.display = 'grid';
+            document.getElementById('cart').style.display = 'block';
             document.getElementById('thank-you').style.display = 'none';
             document.getElementById('product').value = '';
             document.getElementById('symbol').value = '';
